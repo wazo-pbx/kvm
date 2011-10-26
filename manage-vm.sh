@@ -30,11 +30,11 @@ is_vm_exist () {
 }
 
 prepare_disk () {
-    lvcreate -L $vm_size -n $hostname $VG
+    $exec_cmd lvcreate -L $vm_size -n $hostname $VG
 }
 
 delete_disk () {
-    lvremove -f /dev/$VG/$hostname > /dev/null 2>&1
+    $exec_cmd lvremove -f /dev/$VG/$hostname > /dev/null 2>&1
 }
 
 create_vm () {
@@ -44,20 +44,21 @@ create_vm () {
     network="--network bridge=$BRIDGE"
     other="--pxe --vnc  --os-variant=debiansqueeze"
     cmd="$base_cmd $host $network $other"
-    $cmd
+    $exec_cmd $cmd
 }
 
 destroy_vm () {
-    virsh destroy $hostname
-    virsh undefine $hostname
+    $exec_cmd virsh destroy $hostname
+    $exec_cmd virsh undefine $hostname
 }
-while getopts :a:h:m:s:d opt
+while getopts :a:h:m:s:dn opt
 do
   case ${opt} in
     a) action=${OPTARG};;
     d) debug=1;;
     h) hostname=${OPTARG};;
     m) mem_size=${OPTARG};;
+    n) dry_run=1;;
     s) vm_size=${OPTARG};;
     '?')  echo "${0} : option ${OPTARG} is not valid" >&2
           exit -1
@@ -66,6 +67,7 @@ do
 done
 
 debug=${debug:-0}
+dry_run=${dry_run:-0}
 
 if [ $debug -eq 1 ]; then
     set -x
@@ -76,6 +78,12 @@ mem_size=${mem_size:-$DISK_SPACE}
 
 if [ -z $hostname ] || [ -z $action ]; then
     usage
+fi
+
+if [ $dry_run -eq 0 ]; then
+    exec_cmd='bash'
+else
+    exec_cmd='echo'
 fi
 
 if [[ $action =~ create|destroy ]]; then
