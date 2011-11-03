@@ -1,4 +1,4 @@
-VG='raid'
-BRIDGE='br1'
+VG='data'
+BRIDGE='br0'
 MEMORY=1000
 DISK_SPACE=10000

@@ -81,7 +81,7 @@ if [ -z $hostname ] || [ -z $action ]; then
 fi
 
 if [ $dry_run -eq 0 ]; then
-    exec_cmd='bash'
+    exec_cmd=''
 else
     exec_cmd='echo'
 fi
