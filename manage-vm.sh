@@ -1,5 +1,9 @@
 #!/bin/bash
-. ./data
+VG='data'
+BRIDGE='br0'
+MEMORY=2048
+DISK_SPACE=10000
+MACADDR='52:54:00:11:22:35'
 # TODO test shunit2 to test the code
 
 
@@ -30,18 +34,19 @@ is_vm_exist () {
 }
 
 prepare_disk () {
-    $exec_cmd lvcreate -L $vm_size -n $hostname $VG
+    $exec_cmd lvcreate -L ${vm_size}M -n $hostname $VG
 }
 
 delete_disk () {
-    $exec_cmd lvremove -f /dev/$VG/$hostname > /dev/null 2>&1
+    sleep 1
+    $exec_cmd lvremove -f /dev/$VG/$hostname 
 }
 
 create_vm () {
     echo 'create vm'
     base_cmd="virt-install --connect qemu:///system --accelerate"
     host="--name $hostname --ram $mem_size --disk path=/dev/$VG/$hostname"
-    network="--network bridge=$BRIDGE"
+    network="--network bridge=$BRIDGE,mac=$MACADDR"
     other="--pxe --vnc  --os-variant=debiansqueeze"
     cmd="$base_cmd $host $network $other"
     $exec_cmd $cmd
@@ -73,8 +78,8 @@ if [ $debug -eq 1 ]; then
     set -x
 fi
 
-vm_size=${vm_size:-$MEMORY}
-mem_size=${mem_size:-$DISK_SPACE}
+vm_size=${vm_size:-$DISK_SPACE}
+mem_size=${mem_size:-$MEMORY}
 
 if [ -z $hostname ] || [ -z $action ]; then
     usage
@@ -86,6 +91,8 @@ else
     exec_cmd='echo'
 fi
 
+# TODO: check if virt-install is availlable
+# TODO: test if br is availlable too
 if [[ $action =~ create|destroy ]]; then
     if [ $action == 'create' ]; then
         if [ $(is_vm_exist) -eq 0 ]; then
