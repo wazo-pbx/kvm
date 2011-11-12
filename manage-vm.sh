@@ -1,5 +1,5 @@
 #!/bin/bash
-VG='data'
+VOLUME_GROUP='data'
 BRIDGE='br0'
 MEMORY=2048
 DISK_SPACE=10000
@@ -10,9 +10,15 @@ MACADDR='52:54:00:11:22:35'
 usage () {
     cat << EOF
     usage : $(basename $0) -h hostame -a action [-m memory_size] [-s disk_size]
-        -a : availables actions are destroy or create
+                [-b bridge] [-d] [-n] [-v vg]
+        -a : availables actions are destroy or create (mandatory)
+        -b : specify bridge 
+        -d : debug mode
+        -h : hostname (mandatory)
         -m : memory size in megabytes (default 1G)
+        -n : dry run, print actions
         -s : vm disk space size in megabytes (default 10G)
+        -v : volume group where to create logical volume
 EOF
     exit
 }
@@ -34,19 +40,23 @@ is_vm_exist () {
 }
 
 prepare_disk () {
-    $exec_cmd lvcreate -L ${vm_size}M -n $hostname $VG
+    echo "Creating logical volume"
+    $exec_cmd lvcreate -L ${vm_size}M -n $hostname $volume_group
 }
 
 delete_disk () {
+    echo "Deleting logical volume"
     sleep 1
-    $exec_cmd lvremove -f /dev/$VG/$hostname 
+    # workaround to avoid autopartionning error 
+    $exec_cmd dd if=/dev/zero of=$volume bs=1M count=300 &> /dev/null
+    sleep 1
+    $exec_cmd lvremove -f $volume
 }
 
 create_vm () {
-    echo 'create vm'
     base_cmd="virt-install --connect qemu:///system --accelerate"
-    host="--name $hostname --ram $mem_size --disk path=/dev/$VG/$hostname"
-    network="--network bridge=$BRIDGE,mac=$MACADDR"
+    host="--name $hostname --ram $mem_size --disk path=$volume"
+    network="--network bridge=$bridge,mac=$MACADDR"
     other="--pxe --vnc  --os-variant=debiansqueeze"
     cmd="$base_cmd $host $network $other"
     $exec_cmd $cmd
@@ -56,15 +66,39 @@ destroy_vm () {
     $exec_cmd virsh destroy $hostname
     $exec_cmd virsh undefine $hostname
 }
-while getopts :a:h:m:s:dn opt
+
+check_virt () {
+    # TODO: check if virt-install, libvirt, kvm
+    return 0
+}
+
+check_network () {
+    # TODO: test if bridge is configured
+    return 0
+} 
+
+check_disk () {
+    # TODO: test if volume group is available
+    return 0
+} 
+check_env () {
+    check_virt
+    check_network
+    check_disk
+}
+
+
+while getopts :a:b:h:m:s:v:dn opt
 do
   case ${opt} in
     a) action=${OPTARG};;
+    b) bridge=${OPTARG};;
     d) debug=1;;
     h) hostname=${OPTARG};;
     m) mem_size=${OPTARG};;
     n) dry_run=1;;
     s) vm_size=${OPTARG};;
+    v) volume_group=${OPTARG};;
     '?')  echo "${0} : option ${OPTARG} is not valid" >&2
           exit -1
     ;;
@@ -80,6 +114,9 @@ fi
 
 vm_size=${vm_size:-$DISK_SPACE}
 mem_size=${mem_size:-$MEMORY}
+volume_group=${volume_group:-$VOLUME_GROUP}
+bridge=${bridge:-$BRIDGE}
+volume=/dev/$volume_group/$hostname
 
 if [ -z $hostname ] || [ -z $action ]; then
     usage
@@ -91,12 +128,11 @@ else
     exec_cmd='echo'
 fi
 
-# TODO: check if virt-install is availlable
-# TODO: test if br is availlable too
+check_env
+
 if [[ $action =~ create|destroy ]]; then
     if [ $action == 'create' ]; then
         if [ $(is_vm_exist) -eq 0 ]; then
-            echo "create $hostname"
             prepare_disk
             create_vm
         else
@@ -104,7 +140,6 @@ if [[ $action =~ create|destroy ]]; then
         fi
     else
         if [ $(is_vm_exist) -eq 1 ]; then
-            echo "destroy $hostname"
             destroy_vm
             delete_disk
         else
