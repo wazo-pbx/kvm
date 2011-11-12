@@ -67,6 +67,19 @@ destroy_vm () {
     $exec_cmd virsh undefine $hostname
 }
 
+check_if_running () {
+    state=$(virsh dominfo $hostname | grep State | awk '{print $2}')
+    while [ $state == 'running' ]; do
+        state=$(virsh dominfo $hostname | grep State | awk '{print $2}')
+    done
+}
+
+
+start_vm () {
+    sleep 1
+    virsh start $hostname
+}
+
 check_virt () {
     # TODO: check if virt-install, libvirt, kvm
     return 0
@@ -135,6 +148,8 @@ if [[ $action =~ create|destroy ]]; then
         if [ $(is_vm_exist) -eq 0 ]; then
             prepare_disk
             create_vm
+            check_if_running
+            start_vm
         else
             echo 'a vm with this name already exist'
         fi
