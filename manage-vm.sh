@@ -1,19 +1,19 @@
 #!/bin/bash
 VOLUME_GROUP='data'
 BRIDGE='br0'
-MEMORY=2048
+MEM_SIZE=2048
 DISK_SPACE=10000
-MACADDR='52:54:00:11:22:35'
 # TODO test shunit2 to test the code
 
 
 usage () {
     cat << EOF
-    usage : $(basename $0) -h hostame -a action [-m memory_size] [-s disk_size]
-                [-b bridge] [-d] [-n] [-v vg]
-        -a : availables actions are destroy or create (mandatory)
+    usage : $(basename $0) -h hostame -e action -a mac_addr [-m memory_size]
+                [-s disk_size] [-b bridge] [-d] [-n] [-v vg]
+        -a : mac address
         -b : specify bridge 
         -d : debug mode
+        -e : availables actions are destroy or create (mandatory)
         -h : hostname (mandatory)
         -m : memory size in megabytes (default 1G)
         -n : dry run, print actions
@@ -56,8 +56,8 @@ delete_disk () {
 create_vm () {
     base_cmd="virt-install --connect qemu:///system --accelerate"
     host="--name $hostname --ram $mem_size --disk path=$volume"
-    network="--network bridge=$bridge,mac=$MACADDR"
-    other="--pxe --vnc  --os-variant=debiansqueeze"
+    network="--network bridge=$bridge,mac=$mac_addr"
+    other="--pxe --vnc --os-variant=debiansqueeze"
     cmd="$base_cmd $host $network $other"
     $exec_cmd $cmd
 }
@@ -68,32 +68,53 @@ destroy_vm () {
 }
 
 check_if_running () {
-    state=$(virsh dominfo $hostname | grep State | awk '{print $2}')
-    while [ $state == 'running' ]; do
+    if [ $dry_run -eq 0 ]; then
         state=$(virsh dominfo $hostname | grep State | awk '{print $2}')
-    done
+        while [ $state == 'running' ]; do
+            state=$(virsh dominfo $hostname | grep State | awk '{print $2}')
+        done
+    fi
+    return 0
 }
 
 
 start_vm () {
-    sleep 1
-    virsh start $hostname
+    $exec_cmd virsh start $hostname
 }
 
 check_virt () {
-    # TODO: check if virt-install, libvirt, kvm
+    packages="virtinst libvirt-bin kvm"
+    for package in $packages; do
+        dpkg --status $package &> /dev/null
+        if [ $? -ne 0 ]; then
+            echo "You have to install $package"
+            echo "$packages are required"
+            exit -1
+        fi
+    done
     return 0
 }
 
 check_network () {
-    # TODO: test if bridge is configured
+    ip address show $bridge &> /dev/null
+    status=$?
+    if [ $status -ne 0 ]; then
+        echo "Bridge $bridge doesn't exist"
+        exit $status
+    fi
     return 0
 } 
 
 check_disk () {
-    # TODO: test if volume group is available
-    return 0
+    vgs --noheadings $volume_group &> /dev/null
+    status=$?
+    if [ $status -ne 0 ]; then
+        echo "Volume group $volume_group doesn't exist"
+        exit $status
+    fi
+    return $status
 } 
+
 check_env () {
     check_virt
     check_network
@@ -101,12 +122,13 @@ check_env () {
 }
 
 
-while getopts :a:b:h:m:s:v:dn opt
+while getopts :a:b:e:h:m:s:v:dn opt
 do
   case ${opt} in
-    a) action=${OPTARG};;
+    a) mac_addr=${OPTARG};;
     b) bridge=${OPTARG};;
     d) debug=1;;
+    e) execute=${OPTARG};;
     h) hostname=${OPTARG};;
     m) mem_size=${OPTARG};;
     n) dry_run=1;;
@@ -126,12 +148,13 @@ if [ $debug -eq 1 ]; then
 fi
 
 vm_size=${vm_size:-$DISK_SPACE}
-mem_size=${mem_size:-$MEMORY}
+mem_size=${mem_size:-$MEM_SIZE}
+mac_addr=${mac_addr:-$MAC_ADDR}
 volume_group=${volume_group:-$VOLUME_GROUP}
 bridge=${bridge:-$BRIDGE}
 volume=/dev/$volume_group/$hostname
 
-if [ -z $hostname ] || [ -z $action ]; then
+if [ -z $hostname ] || [ -z $execute ]; then
     usage
 fi
 
@@ -143,8 +166,10 @@ fi
 
 check_env
 
-if [[ $action =~ create|destroy ]]; then
-    if [ $action == 'create' ]; then
+exit 0
+
+if [[ $execute =~ create|destroy ]]; then
+    if [ $execute == 'create' ]; then
         if [ $(is_vm_exist) -eq 0 ]; then
             prepare_disk
             create_vm
