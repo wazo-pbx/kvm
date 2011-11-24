@@ -55,8 +55,12 @@ delete_disk () {
 
 create_vm () {
     base_cmd="virt-install --connect qemu:///system --accelerate"
-    host="--name $hostname --ram $mem_size --disk path=$volume"
-    network="--network bridge=$bridge,mac=$mac_addr"
+    host="--name $hostname --ram $mem_size --disk path=$volume,size=1"
+    if [ -n $mac_addr ]; then
+        network="--network bridge=$bridge,mac=$mac_addr"
+    else
+        network="--network bridge=$bridge"
+    fi
     other="--pxe --vnc --os-variant=debiansqueeze"
     cmd="$base_cmd $host $network $other"
     $exec_cmd $cmd
@@ -95,24 +99,24 @@ check_virt () {
     return 0
 }
 
-check_network () {
-    ip address show $bridge &> /dev/null
+check_cmd () {
+    cmd=$1
+    arg=$2
+    full_cmd="$cmd $arg"
+    $full_cmd &> /dev/null
     status=$?
     if [ $status -ne 0 ]; then
-        echo "Bridge $bridge doesn't exist"
-        exit $status
-    fi
-    return 0
-} 
-
-check_disk () {
-    vgs --noheadings $volume_group &> /dev/null
-    status=$?
-    if [ $status -ne 0 ]; then
-        echo "Volume group $volume_group doesn't exist"
+        echo "$arg doesn't exist"
         exit $status
     fi
     return $status
+}
+check_network () {
+    check_cmd "ip address show" "$bridge"
+} 
+
+check_disk () {
+    check_cmd "vgs --noheadings" "$volume_group"
 } 
 
 check_env () {
@@ -165,8 +169,6 @@ else
 fi
 
 check_env
-
-exit 0
 
 if [[ $execute =~ create|destroy ]]; then
     if [ $execute == 'create' ]; then
