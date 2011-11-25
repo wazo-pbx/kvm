@@ -12,6 +12,7 @@ usage () {
                 [-s disk_size] [-b bridge] [-d] [-n] [-v vg]
         -a : mac address
         -b : specify bridge 
+        -c : cdrom path
         -d : debug mode
         -e : availables actions are destroy or create (mandatory)
         -h : hostname (mandatory)
@@ -56,13 +57,18 @@ delete_disk () {
 create_vm () {
     base_cmd="virt-install --connect qemu:///system --accelerate"
     host="--name $hostname --ram $mem_size --disk path=$volume,size=1"
-    if [ -n $mac_addr ]; then
-        network="--network bridge=$bridge,mac=$mac_addr"
-    else
+    if [ -z $mac_addr ]; then
         network="--network bridge=$bridge"
+    else
+        network="--network bridge=$bridge,mac=$mac_addr"
     fi
-    other="--pxe --vnc --os-variant=debiansqueeze"
-    cmd="$base_cmd $host $network $other"
+    if [ -z $cdrom ]; then
+        boot="--pxe"
+    else
+        boot="--cdrom $cdrom"
+    fi
+    other="--vnc --os-variant=debiansqueeze"
+    cmd="$base_cmd $host $network $boot $other"
     $exec_cmd $cmd
 }
 
@@ -119,18 +125,24 @@ check_disk () {
     check_cmd "vgs --noheadings" "$volume_group"
 } 
 
+check_boot () {
+    check_cmd "ls $cdrom"
+}
+
 check_env () {
     check_virt
     check_network
+    check_boot
     check_disk
 }
 
 
-while getopts :a:b:e:h:m:s:v:dn opt
+while getopts :a:b:c:e:h:m:s:v:dn opt
 do
   case ${opt} in
     a) mac_addr=${OPTARG};;
     b) bridge=${OPTARG};;
+    c) cdrom=${OPTARG};;
     d) debug=1;;
     e) execute=${OPTARG};;
     h) hostname=${OPTARG};;
