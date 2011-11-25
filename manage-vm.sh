@@ -187,8 +187,10 @@ if [[ $execute =~ create|destroy ]]; then
         if [ $(is_vm_exist) -eq 0 ]; then
             prepare_disk
             create_vm
-            check_if_running
-            start_vm
+            if [ ! -z $cdrom ];
+                check_if_running
+                start_vm
+            fi
         else
             echo 'a vm with this name already exist'
         fi
