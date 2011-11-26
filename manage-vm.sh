@@ -54,7 +54,7 @@ delete_disk () {
     $exec_cmd lvremove -f $volume
 }
 
-create_vm () {
+configure_and_start () {
     base_cmd="virt-install --connect qemu:///system --accelerate"
     host="--name $hostname --ram $mem_size --disk path=$volume,size=1"
     if [ -z $mac_addr ]; then
@@ -136,6 +136,27 @@ check_env () {
     check_disk
 }
 
+create_vm () {
+    if [ $(is_vm_exist) -eq 0 ]; then
+        prepare_disk
+        configure_and_start
+        if [ ! -z $cdrom ]; then
+            check_if_running
+            start_vm
+        fi
+    else
+        echo 'a vm with this name already exist'
+    fi
+}
+
+destroy_vm () {
+    if [ $(is_vm_exist) -eq 1 ]; then
+        destroy_vm
+        delete_disk
+    else
+        echo 'this vm does not exist'
+    fi
+}
 
 while getopts :a:b:c:e:h:m:s:v:dn opt
 do
@@ -182,26 +203,8 @@ fi
 
 check_env
 
-if [[ $execute =~ create|destroy ]]; then
-    if [ $execute == 'create' ]; then
-        if [ $(is_vm_exist) -eq 0 ]; then
-            prepare_disk
-            create_vm
-            if [ ! -z $cdrom ];
-                check_if_running
-                start_vm
-            fi
-        else
-            echo 'a vm with this name already exist'
-        fi
-    else
-        if [ $(is_vm_exist) -eq 1 ]; then
-            destroy_vm
-            delete_disk
-        else
-            echo 'this vm does not exist'
-        fi
-    fi
-else
-    usage
-fi
+case $execute in
+    create) create_vm;;
+    destroy) destroy_vm;;
+    *) usage;;
+esac
