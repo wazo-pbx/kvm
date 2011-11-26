@@ -72,7 +72,7 @@ configure_and_start () {
     $exec_cmd $cmd
 }
 
-destroy_vm () {
+shutdown_and_remove_vm () {
     $exec_cmd virsh destroy $hostname
     $exec_cmd virsh undefine $hostname
 }
@@ -151,7 +151,7 @@ create_vm () {
 
 destroy_vm () {
     if [ $(is_vm_exist) -eq 1 ]; then
-        destroy_vm
+        shutdown_and_remove_vm
         delete_disk
     else
         echo 'this vm does not exist'
