@@ -140,7 +140,7 @@ create_vm () {
     if [ $(is_vm_exist) -eq 0 ]; then
         prepare_disk
         configure_and_start
-        if [ ! -z $cdrom ]; then
+        if [ -z $cdrom ]; then
             check_if_running
             start_vm
         fi
