@@ -9,15 +9,16 @@ DISK_SPACE=10000
 usage () {
     cat << EOF
     usage : $(basename $0) -h hostame -e action -a mac_addr [-m memory_size]
-                [-s disk_size] [-b bridge] [-d] [-n] [-v vg]
+                [-s disk_size] [-b bridge] [-t lvm] [-d] [-n] [-v vg]
         -a : mac address
         -b : specify bridge 
         -c : cdrom path
         -d : debug mode
-        -e : availables actions are destroy or create (mandatory)
+        -e : availables actions are delete or create (mandatory)
         -h : hostname (mandatory)
         -m : memory size in megabytes (default 1G)
         -n : dry run, print actions
+        -t : disk type lvm or qcow2 (qcow2 default)
         -s : vm disk space size in megabytes (default 10G)
         -v : volume group where to create logical volume
 EOF
@@ -40,12 +41,32 @@ is_vm_exist () {
     echo $exist
 }
 
-prepare_disk () {
+create_disk () {
+    if [ $disk_type = 'qcow2' ]; then
+        create_qcow
+    else
+        create_lvm
+    fi
+}
+
+create_lvm () {
     echo "Creating logical volume"
     $exec_cmd lvcreate -L ${vm_size}M -n $hostname $volume_group
 }
 
+create_qcow () {
+    $exec_cmd qemu-img create -f qcow2 $qcow_file ${vm_size}M
+}
+
 delete_disk () {
+    if [ $disk_type = 'qcow2' ]; then
+        delete_qcow
+    else
+        delete_lvm
+    fi
+}
+
+delete_lvm () {
     echo "Deleting logical volume"
     sleep 1
     # workaround to avoid autopartionning error 
@@ -54,9 +75,13 @@ delete_disk () {
     $exec_cmd lvremove -f $volume
 }
 
+delete_qcow () {
+    $exec_cmd rm $qcow_file
+}
+
 configure_and_start () {
     base_cmd="virt-install --connect qemu:///system --accelerate"
-    host="--name $hostname --ram $mem_size --disk path=$volume,size=1"
+    host="--name $hostname --ram $mem_size"
     if [ -z $mac_addr ]; then
         network="--network bridge=$bridge"
     else
@@ -67,8 +92,13 @@ configure_and_start () {
     else
         boot="--cdrom $cdrom"
     fi
+    if [ $disk_type = 'qcow2' ]; then
+        disk="--disk path=$volume,size=1,format=qcow2"
+    else
+        disk="--disk path=$qcow_file,size=1"
+    fi
     other="--vnc --os-variant=debiansqueeze"
-    cmd="$base_cmd $host $network $boot $other"
+    cmd="$base_cmd $host $network $boot $disk $other"
     $exec_cmd $cmd
 }
 
@@ -138,7 +168,7 @@ check_env () {
 
 create_vm () {
     if [ $(is_vm_exist) -eq 0 ]; then
-        prepare_disk
+        create_disk
         configure_and_start
         if [ -z $cdrom ]; then
             check_if_running
@@ -149,7 +179,7 @@ create_vm () {
     fi
 }
 
-destroy_vm () {
+delete_vm () {
     if [ $(is_vm_exist) -eq 1 ]; then
         shutdown_and_remove_vm
         delete_disk
@@ -158,7 +188,7 @@ destroy_vm () {
     fi
 }
 
-while getopts :a:b:c:e:h:m:s:v:dn opt
+while getopts :a:b:c:e:h:m:s:t:v:dn opt
 do
   case ${opt} in
     a) mac_addr=${OPTARG};;
@@ -170,6 +200,7 @@ do
     m) mem_size=${OPTARG};;
     n) dry_run=1;;
     s) vm_size=${OPTARG};;
+    t) disk_type=${OPTARG};;
     v) volume_group=${OPTARG};;
     '?')  echo "${0} : option ${OPTARG} is not valid" >&2
           exit -1
@@ -188,8 +219,10 @@ vm_size=${vm_size:-$DISK_SPACE}
 mem_size=${mem_size:-$MEM_SIZE}
 mac_addr=${mac_addr:-$MAC_ADDR}
 volume_group=${volume_group:-$VOLUME_GROUP}
+disk_type=${disk_type:-'qcow2'}
 bridge=${bridge:-$BRIDGE}
 volume=/dev/$volume_group/$hostname
+qcow_file=/var/lib/libvirt/images/$hostname.qcow2
 
 if [ -z $hostname ] || [ -z $execute ]; then
     usage
@@ -204,7 +237,7 @@ fi
 check_env
 
 case $execute in
-    create) create_vm;;
-    destroy) destroy_vm;;
+    create)  create_vm;;
+    delete)  delete_vm;;
     *) usage;;
 esac
