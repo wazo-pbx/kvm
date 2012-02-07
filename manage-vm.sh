@@ -42,9 +42,8 @@ is_vm_exist () {
 }
 
 create_disk () {
-    if [ $disk_type = 'qcow2' ]; then
-        create_qcow
-    else
+    # virt-install will create qcow2 disk later
+    if [ $disk_type = 'lvm' ]; then
         create_lvm
     fi
 }
@@ -52,10 +51,6 @@ create_disk () {
 create_lvm () {
     echo "Creating logical volume"
     $exec_cmd lvcreate -L ${vm_size}M -n $hostname $volume_group
-}
-
-create_qcow () {
-    $exec_cmd qemu-img create -f qcow2 $qcow_file ${vm_size}M
 }
 
 delete_disk () {
@@ -80,6 +75,7 @@ delete_qcow () {
 }
 
 configure_and_start () {
+    disk_in_giga=$(perl -e "print $DISK_SPACE/1000")
     base_cmd="virt-install --connect qemu:///system --accelerate"
     host="--name $hostname --ram $mem_size"
     if [ -z $mac_addr ]; then
@@ -93,9 +89,9 @@ configure_and_start () {
         boot="--cdrom $cdrom"
     fi
     if [ $disk_type = 'qcow2' ]; then
-        disk="--disk path=$volume,size=1,format=qcow2"
+        disk="--disk path=$qcow_file,format=qcow2,size=$disk_in_giga"
     else
-        disk="--disk path=$qcow_file,size=1"
+        disk="--disk path=$volume,size=$disk_in_giga"
     fi
     other="--vnc --os-variant=debiansqueeze"
     cmd="$base_cmd $host $network $boot $disk $other"
