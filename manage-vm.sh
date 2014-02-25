@@ -89,11 +89,12 @@ configure_and_start () {
         boot="--cdrom $cdrom"
     fi
     if [ $disk_type = 'qcow2' ]; then
-        disk="--disk path=$qcow_file,format=qcow2,size=$disk_in_giga"
+        disk="--disk path=$qcow_file,format=qcow2"
     else
         disk="--disk path=$volume,size=$disk_in_giga"
     fi
-    other="--vnc --os-variant=debiansqueeze"
+    other="--vnc --os-variant=debianwheezy"
+    qemu-img create -f qcow2 $qcow_file ${disk_in_giga}G
     cmd="$base_cmd $host $network $boot $disk $other"
     $exec_cmd $cmd
 }
@@ -108,6 +109,7 @@ check_if_running () {
         state=$(virsh dominfo $hostname | grep State | awk '{print $2}')
         while [ $state == 'running' ]; do
             state=$(virsh dominfo $hostname | grep State | awk '{print $2}')
+            sleep 15
         done
     fi
     return 0
@@ -115,6 +117,7 @@ check_if_running () {
 
 
 start_vm () {
+	sleep 5
     $exec_cmd virsh start $hostname
 }
 
