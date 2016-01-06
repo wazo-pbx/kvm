@@ -122,7 +122,7 @@ start_vm () {
 }
 
 check_virt () {
-    packages="virtinst libvirt-bin kvm"
+    packages="virtinst libvirt-bin qemu-kvm"
     for package in $packages; do
         dpkg --status $package &> /dev/null
         if [ $? -ne 0 ]; then
