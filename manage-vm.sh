@@ -107,7 +107,7 @@ shutdown_and_remove_vm () {
 check_if_running () {
     if [ $dry_run -eq 0 ]; then
         state=$(virsh dominfo $hostname | grep State | awk '{print $2}')
-        while [ $state == 'running' ]; do
+        while [ "$state" == "running" ]; do
             state=$(virsh dominfo $hostname | grep State | awk '{print $2}')
             sleep 15
         done
