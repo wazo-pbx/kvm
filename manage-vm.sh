@@ -104,23 +104,6 @@ shutdown_and_remove_vm () {
     $exec_cmd virsh undefine $hostname
 }
 
-check_if_running () {
-    if [ $dry_run -eq 0 ]; then
-        state=$(virsh dominfo $hostname | grep State | awk '{print $2}')
-        while [ "$state" == "running" ]; do
-            state=$(virsh dominfo $hostname | grep State | awk '{print $2}')
-            sleep 15
-        done
-    fi
-    return 0
-}
-
-
-start_vm () {
-	sleep 5
-    $exec_cmd virsh start $hostname
-}
-
 check_virt () {
     packages="virtinst libvirt-bin qemu-kvm"
     for package in $packages; do
@@ -169,10 +152,6 @@ create_vm () {
     if [ $(is_vm_exist) -eq 0 ]; then
         create_disk
         configure_and_start
-        if [ -z $cdrom ]; then
-            check_if_running
-            start_vm
-        fi
     else
         echo 'a vm with this name already exist'
     fi
