@@ -93,7 +93,7 @@ configure_and_start () {
     else
         disk="--disk path=$volume,size=$disk_in_giga"
     fi
-    other="--vnc --os-variant=debianjessie"
+    other="--vnc --os-variant=debianwheezy"
     qemu-img create -f qcow2 $qcow_file ${disk_in_giga}G
     cmd="$base_cmd $host $network $boot $disk $other"
     $exec_cmd $cmd
