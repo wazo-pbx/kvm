@@ -77,7 +77,7 @@ delete_qcow () {
 configure_and_start () {
     disk_in_giga=$(perl -e "print $DISK_SPACE/1000")
     base_cmd="virt-install --connect qemu:///system --accelerate"
-    host="--name $hostname --ram $mem_size"
+    host="--name $hostname --cpu host-passthrough --ram $mem_size"
     if [ -z $mac_addr ]; then
         network="--network bridge=$bridge"
     else
