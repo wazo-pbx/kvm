@@ -9,14 +9,15 @@ DISK_SPACE=10000
 usage () {
     cat << EOF
     usage : $(basename $0) -h hostame -e action -a mac_addr [-m memory_size]
-                [-s disk_size] [-b bridge] [-t lvm] [-d] [-n] [-v vg]
+                [-s disk_size] [-b bridge] [-t lvm] [-d] [-n] [-v vg] [-D disk-cache-mode]
         -a : mac address
-        -b : specify bridge 
+        -b : specify bridge
         -c : cdrom path
         -d : debug mode
         -e : availables actions are delete or create (mandatory)
         -h : hostname (mandatory)
         -m : memory size in megabytes (default 1G)
+        -D : disk cache mode
         -n : dry run, print actions
         -t : disk type lvm or qcow2 (qcow2 default)
         -s : vm disk space size in megabytes (default 10G)
@@ -93,6 +94,9 @@ configure_and_start () {
     else
         disk="--disk path=$volume,size=$disk_in_giga"
     fi
+    if [ -n $disk_cache ]; then
+        disk="${disk},cache=${disk_cache}"
+    fi
     other="--vnc --os-variant=debian9"
     qemu-img create -f qcow2 $qcow_file ${disk_in_giga}G
     cmd="$base_cmd $host $network $boot $disk $other"
@@ -166,13 +170,14 @@ delete_vm () {
     fi
 }
 
-while getopts :a:b:c:e:h:m:s:t:v:dn opt
+while getopts :a:b:c:D:e:h:m:s:t:v:dn opt
 do
   case ${opt} in
     a) mac_addr=${OPTARG};;
     b) bridge=${OPTARG};;
     c) cdrom=${OPTARG};;
     d) debug=1;;
+    D) disk_cache=${OPTARG};;
     e) execute=${OPTARG};;
     h) hostname=${OPTARG};;
     m) mem_size=${OPTARG};;
@@ -198,6 +203,7 @@ mem_size=${mem_size:-$MEM_SIZE}
 mac_addr=${mac_addr:-$MAC_ADDR}
 volume_group=${volume_group:-$VOLUME_GROUP}
 disk_type=${disk_type:-'qcow2'}
+disk_cache=${disk_cache:-$DISK_CACHE}
 bridge=${bridge:-$BRIDGE}
 volume=/dev/$volume_group/$hostname
 qcow_file=/var/lib/libvirt/images/$hostname.qcow2
