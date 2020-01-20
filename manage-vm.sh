@@ -90,7 +90,7 @@ configure_and_start () {
         boot="--cdrom $cdrom"
     fi
     if [ $disk_type = 'qcow2' ]; then
-        disk="--disk path=$qcow_file,format=qcow2,size=${disk_in_giga}G"
+        disk="--disk path=$qcow_file,format=qcow2"
     else
         disk="--disk path=$volume,size=$disk_in_giga"
     fi
