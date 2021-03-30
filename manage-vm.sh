@@ -19,7 +19,6 @@ usage () {
         -m : memory size in megabytes (default 1G)
         -D : disk cache mode
         -n : dry run, print actions
-        -t : disk type lvm or qcow2 (qcow2 default)
         -s : vm disk space size in megabytes (default 10G)
         -v : volume group where to create logical volume
 EOF
@@ -42,33 +41,8 @@ is_vm_exist () {
     echo $exist
 }
 
-create_disk () {
-    # virt-install will create qcow2 disk later
-    if [ $disk_type = 'lvm' ]; then
-        create_lvm
-    fi
-}
-
-create_lvm () {
-    echo "Creating logical volume"
-    $exec_cmd lvcreate -L ${vm_size}M -n $hostname $volume_group
-}
-
 delete_disk () {
-    if [ $disk_type = 'qcow2' ]; then
-        delete_qcow
-    else
-        delete_lvm
-    fi
-}
-
-delete_lvm () {
-    echo "Deleting logical volume"
-    sleep 1
-    # workaround to avoid autopartionning error 
-    $exec_cmd dd if=/dev/zero of=$volume bs=1M count=300 &> /dev/null
-    sleep 1
-    $exec_cmd lvremove -f $volume
+    delete_qcow
 }
 
 delete_qcow () {
@@ -89,11 +63,7 @@ configure_and_start () {
     else
         boot="--cdrom $cdrom"
     fi
-    if [ $disk_type = 'qcow2' ]; then
-        disk="--disk path=$qcow_file,format=qcow2"
-    else
-        disk="--disk path=$volume,size=$disk_in_giga"
-    fi
+    disk="--disk path=$qcow_file,format=qcow2"
     if [ -n $disk_cache ]; then
         disk="${disk},cache=${disk_cache}"
     fi
@@ -135,11 +105,7 @@ check_cmd () {
 }
 check_network () {
     check_cmd "ip address show" "$bridge"
-} 
-
-check_disk () {
-    check_cmd "vgs --noheadings" "$volume_group"
-} 
+}
 
 check_boot () {
     check_cmd "ls $cdrom"
@@ -149,12 +115,10 @@ check_env () {
     check_virt
     check_network
     check_boot
-    check_disk
 }
 
 create_vm () {
     if [ $(is_vm_exist) -eq 0 ]; then
-        create_disk
         configure_and_start
     else
         echo 'a vm with this name already exist'
@@ -183,7 +147,6 @@ do
     m) mem_size=${OPTARG};;
     n) dry_run=1;;
     s) vm_size=${OPTARG};;
-    t) disk_type=${OPTARG};;
     v) volume_group=${OPTARG};;
     '?')  echo "${0} : option ${OPTARG} is not valid" >&2
           exit -1
@@ -202,7 +165,6 @@ vm_size=${vm_size:-$DISK_SPACE}
 mem_size=${mem_size:-$MEM_SIZE}
 mac_addr=${mac_addr:-$MAC_ADDR}
 volume_group=${volume_group:-$VOLUME_GROUP}
-disk_type=${disk_type:-'qcow2'}
 disk_cache=${disk_cache:-$DISK_CACHE}
 bridge=${bridge:-$BRIDGE}
 volume=/dev/$volume_group/$hostname
