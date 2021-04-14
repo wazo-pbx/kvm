@@ -79,7 +79,7 @@ shutdown_and_remove_vm () {
 }
 
 check_virt () {
-    packages="virtinst libvirt-bin qemu-kvm"
+    packages="virtinst libvirt-daemon-system qemu-kvm"
     for package in $packages; do
         dpkg --status $package &> /dev/null
         if [ $? -ne 0 ]; then
