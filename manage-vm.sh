@@ -16,7 +16,7 @@ usage () {
         -d : debug mode
         -e : availables actions are delete or create (mandatory)
         -h : hostname (mandatory)
-        -m : memory size in megabytes (default 1G)
+        -m : memory size in megabytes (default 2G)
         -D : disk cache mode
         -n : dry run, print actions
         -s : vm disk space size in megabytes (default 10G)
